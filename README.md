@@ -52,6 +52,7 @@ The relevant investigation was done on 2026-10-09:
 - The non-GDM session showed `Xorg :0 vt8`, `gnome-session-binary`, and `gnome-shell`, while `gdm.service` was inactive.
 - GDM is a static unit wanted by `graphical.target`; the default target is `multi-user.target`, so it can remain off at boot and be started on demand.
 - The clock showed the wrong time zone because the board was on `Etc/UTC` and automatic time zone cannot work: geoclue still defaults to the retired Mozilla Location Service. See [FINDINGS.md](FINDINGS.md).
+- VS Code Insiders `1.142.0-1791480482` for arm64 aborted because its `.deb` installed `chrome-sandbox` as mode `0755` while Ubuntu restricted the user-namespace fallback. A root-owned `4755` dpkg statoverride fixed the launch and keeps the permission across upgrades. See [FINDINGS.md](FINDINGS.md).
 
 Do not edit the `edge-fex/findings` repository from this project. It has its own Git history and Copilot session.
 

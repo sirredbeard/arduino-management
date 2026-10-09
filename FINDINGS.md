@@ -117,3 +117,59 @@ device, the geolocation backend it depends on no longer exists, and an
 explicit zone is one less moving part. There is a `[static-source]` section in
 `/etc/geoclue/geoclue.conf` that can feed geoclue fixed coordinates, but that
 is more machinery than a board that never moves needs.
+
+## VS Code Insiders aborted on launch
+
+Date: 2026-10-08
+
+VS Code Insiders `1.142.0-1791480482` for arm64 installed correctly, however,
+every launch aborted before opening a window:
+
+```
+FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166
+The SUID sandbox helper binary was found, but is not configured correctly.
+You need to make sure that /usr/share/code-insiders/chrome-sandbox is owned
+by root and has mode 4755.
+```
+
+This was not an architecture mismatch. The VENTUNO Q reports `aarch64`, dpkg
+reports `arm64`, and the installed package is the arm64 build.
+
+The downloaded `.deb` ships
+`/usr/share/code-insiders/chrome-sandbox` as root-owned mode `0755`. Ubuntu
+24.04 on this board also has
+`kernel.apparmor_restrict_unprivileged_userns = 1`. The kernel audit log
+showed AppArmor denying `CAP_SYS_ADMIN` when Code Insiders tried to create its
+unprivileged user namespace. Electron then found the SUID sandbox helper, saw
+that the setuid bit was missing, and gave up. The Ubuntu crash report was a
+result of that deliberate fatal abort.
+
+The immediate fix is:
+
+```
+$ sudo chown root:root /usr/share/code-insiders/chrome-sandbox
+$ sudo chmod 4755 /usr/share/code-insiders/chrome-sandbox
+```
+
+The package contains the wrong mode, so installing the same `.deb` again
+would put it back. This dpkg override keeps the required ownership and mode
+across package upgrades:
+
+```
+$ sudo dpkg-statoverride --add root root 4755 /usr/share/code-insiders/chrome-sandbox
+```
+
+After the override, `stat` reported:
+
+```
+4755 root:root /usr/share/code-insiders/chrome-sandbox
+```
+
+`code-insiders --verbose --disable-extensions` then stayed running for the
+12-second verification period with the SUID sandbox, zygote, GPU, renderer,
+and utility processes active. There were no new fatal sandbox or crash
+entries. VA-API still logged `vaInitialize failed: unknown libva error`, but
+that warning did not prevent the window from launching.
+
+Running Code Insiders with `--no-sandbox` is not needed and would remove an
+important security boundary.
