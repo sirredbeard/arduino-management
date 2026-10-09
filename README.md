@@ -51,6 +51,7 @@ The relevant investigation was done on 2026-10-09:
 - The local crash dialog reported Ubuntu 24.04, GNOME Shell 46.0, and `SIGABRT` in `__pthread_kill_implementation`.
 - The non-GDM session showed `Xorg :0 vt8`, `gnome-session-binary`, and `gnome-shell`, while `gdm.service` was inactive.
 - GDM is a static unit wanted by `graphical.target`; the default target is `multi-user.target`, so it can remain off at boot and be started on demand.
+- The clock showed the wrong time zone because the board was on `Etc/UTC` and automatic time zone cannot work: geoclue still defaults to the retired Mozilla Location Service. See [FINDINGS.md](FINDINGS.md).
 
 Do not edit the `edge-fex/findings` repository from this project. It has its own Git history and Copilot session.
 

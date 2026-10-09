@@ -54,3 +54,66 @@ on/off switch. The installed `gdm.service` is static and wanted by
 
 The findings came from the separate `~/edge-fex/findings` repository. That
 repository was read only and was not modified from this project.
+
+## Clock showed the wrong time zone
+
+Date: 2026-10-08
+
+The GNOME clock was four hours ahead. Settings showed `UTC (London, United
+Kingdom)` with both `Automatic Date & Time` and `Automatic Time Zone` turned
+on.
+
+The clock itself was correct. `timedatectl` reported `System clock
+synchronized: yes` with the NTP service active. Only the zone was wrong:
+
+```
+Time zone: Etc/UTC
+```
+
+`/etc/localtime` pointed at `/usr/share/zoneinfo/Etc/UTC`.
+
+Two separate things were going on.
+
+First, automatic time zone could never work. `geoclue-2.0 2.7.0-3ubuntu7`
+still defaults to the Mozilla Location Service, which was retired in June
+2024. Every lookup fails:
+
+```
+geoclue[...]: Failed to query location: Query location SOUP error: Not Found
+```
+
+GNOME asks geoclue for a position, geoclue gets an HTTP 404, and the time zone
+is never set. The toggle is on and does nothing.
+
+Second, `London` was never a detected location. `gnome-control-center
+1:46.7-0ubuntu0.24.04.6` logs:
+
+```
+gnome-control-c: Timezone 'Etc/UTC' is unhandled, setting Europe/London as default
+```
+
+That is Settings mislabeling `Etc/UTC` in the picker. The board did not think
+it was in the United Kingdom. It thought it was in UTC, which it was.
+
+The fix is to set the zone explicitly:
+
+```
+$ sudo timedatectl set-timezone America/New_York
+```
+
+`timedatectl` writes the `/etc/localtime` symlink but leaves the Debian legacy
+file alone, so that needs syncing too or tools that read it stay on the old
+value:
+
+```
+$ echo 'America/New_York' | sudo tee /etc/timezone
+```
+
+After that, `timedatectl status` reports `America/New_York (EDT, -0400)` and
+the clock is correct.
+
+I would leave `Automatic Time Zone` off on this board. It is a stationary
+device, the geolocation backend it depends on no longer exists, and an
+explicit zone is one less moving part. There is a `[static-source]` section in
+`/etc/geoclue/geoclue.conf` that can feed geoclue fixed coordinates, but that
+is more machinery than a board that never moves needs.
